@@ -1,4 +1,5 @@
 use super::k_quants::{BlockQ2K, BlockQ4K, BlockQ4_0, BlockQ6K, BlockQ8K, BlockQ8_0, QK8_0, QK_K};
+#[allow(unused_imports)]
 use crate::IsMultipleOf;
 use byteorder::{ByteOrder, LittleEndian};
 use half::f16;

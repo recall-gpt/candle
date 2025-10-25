@@ -1,6 +1,8 @@
 //! Code for GGML and GGUF files
 use crate::{Context, CpuStorage, DType, Device, Result, Shape, Storage, Tensor};
 use k_quants::*;
+#[allow(unused_imports)]
+use crate::IsMultipleOf;
 use std::borrow::Cow;
 
 #[cfg(target_feature = "avx2")]

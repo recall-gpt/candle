@@ -5,6 +5,8 @@ use super::utils::{
 use super::GgmlDType;
 use crate::Result;
 use byteorder::{ByteOrder, LittleEndian};
+#[allow(unused_imports)]
+use crate::IsMultipleOf;
 use half::{bf16, f16, slice::HalfFloatSliceExt};
 use rayon::prelude::*;
 

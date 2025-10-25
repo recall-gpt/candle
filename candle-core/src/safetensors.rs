@@ -11,6 +11,8 @@
 //!
 use crate::{DType, Device, Error, Result, Tensor, WithDType};
 use float8::F8E4M3;
+#[allow(unused_imports)]
+use crate::IsMultipleOf;
 use safetensors::tensor as st;
 use safetensors::tensor::SafeTensors;
 use std::borrow::Cow;
