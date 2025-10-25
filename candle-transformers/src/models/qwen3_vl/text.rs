@@ -146,6 +146,12 @@ impl Attention {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn clear_kv_cache(&self) {
+        if let Ok(mut cache) = self.kv_cache.lock() {
+            cache.reset();
+        }
+    }
+
     fn forward(
         &self,
         xs: &Tensor,
@@ -228,6 +234,10 @@ impl DecoderLayer {
         })
     }
 
+    fn clear_kv_cache(&self) {
+        self.self_attn.clear_kv_cache();
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn forward(
         &self,
@@ -294,6 +304,10 @@ impl Qwen3VLTextModel {
             dtype: vb.dtype(),
             num_attn_heads: cfg.num_attention_heads,
         })
+    }
+
+    pub fn clear_kv_cache(&mut self) {
+        self.layers.iter().for_each(DecoderLayer::clear_kv_cache);
     }
 
     pub fn embed_tokens(&self, input_ids: &Tensor) -> Result<Tensor> {

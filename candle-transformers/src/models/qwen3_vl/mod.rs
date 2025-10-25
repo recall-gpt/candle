@@ -267,4 +267,8 @@ impl Qwen3VLModel {
         )?;
         Ok(out)
     }
+
+    pub fn clear_kv_cache(&mut self) {
+        self.text.clear_kv_cache();
+    }
 }
