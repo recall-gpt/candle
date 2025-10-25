@@ -1,6 +1,28 @@
 //! Useful functions for checking features.
 use std::str::FromStr;
 
+/// Extension trait that backports the nightly-only `is_multiple_of` helper
+/// so we can keep using stable Rust compilers.
+pub trait IsMultipleOf:
+    Sized + Copy + PartialEq + std::ops::Rem<Output = Self> + From<u8>
+{
+    #[inline]
+    fn is_multiple_of(self, other: Self) -> bool {
+        if other == Self::from(0) {
+            return false;
+        }
+        self % other == Self::from(0)
+    }
+}
+
+macro_rules! impl_is_multiple_of {
+    ($($ty:ty),* $(,)?) => {
+        $(impl IsMultipleOf for $ty {})*
+    };
+}
+
+impl_is_multiple_of!(usize, u128, u64, u32, u16, u8);
+
 pub fn get_num_threads() -> usize {
     // Respond to the same environment variable as rayon.
     match std::env::var("RAYON_NUM_THREADS")

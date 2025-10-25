@@ -3,7 +3,7 @@ use candle_core::{
     quantized::{self, GgmlDType},
     test_device,
     test_utils::to_vec2_round,
-    DType, Device, IndexOp, Module, Result, Tensor,
+    DType, Device, IndexOp, IsMultipleOf, Module, Result, Tensor,
 };
 use quantized::{k_quants, GgmlType};
 use rand::prelude::*;

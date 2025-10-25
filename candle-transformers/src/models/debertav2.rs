@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use candle::{bail, Context, DType, Device, Module, Result, Tensor, D};
+use candle::{bail, Context, DType, Device, IsMultipleOf, Module, Result, Tensor, D};
 use candle_nn::{
     conv1d, embedding, layer_norm, Conv1d, Conv1dConfig, Embedding, LayerNorm, VarBuilder,
 };

@@ -3,8 +3,8 @@
 use std::{f32::consts::PI, sync::Arc};
 
 use candle::{
-    shape::Dim, CpuStorage, CustomOp1, DType, Device, Error, IndexOp, Layout, Result, Shape,
-    Tensor, WithDType, D,
+    shape::Dim, CpuStorage, CustomOp1, DType, Device, Error, IndexOp, IsMultipleOf, Layout, Result,
+    Shape, Tensor, WithDType, D,
 };
 use candle_nn::{embedding, rms_norm, Activation, Embedding, Linear, Module, RmsNorm, VarBuilder};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};

@@ -17,7 +17,7 @@
 //!
 
 use crate::models::with_tracing::{linear, linear_no_bias, Linear, RmsNorm};
-use candle::{DType, Device, Module, Result, Tensor, D};
+use candle::{DType, Device, IsMultipleOf, Module, Result, Tensor, D};
 use candle_nn::{Activation, VarBuilder};
 use std::sync::Arc;
 

@@ -2,6 +2,7 @@
 // https://github.com/ggerganov/whisper.cpp
 
 use candle::utils::get_num_threads;
+use candle::IsMultipleOf;
 use std::sync::Arc;
 use std::thread;
 

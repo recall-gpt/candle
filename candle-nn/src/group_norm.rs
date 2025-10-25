@@ -1,7 +1,7 @@
 //! Group Normalization.
 //!
 //! This layer applies Group Normalization over a mini-batch of inputs.
-use candle::{DType, Result, Tensor};
+use candle::{DType, IsMultipleOf, Result, Tensor};
 
 // This group norm version handles both weight and bias so removes the mean.
 #[derive(Clone, Debug)]

@@ -103,6 +103,7 @@ pub use streaming::{StreamTensor, StreamingBinOp, StreamingModule};
 pub use strided_index::{StridedBlocks, StridedIndex};
 pub use tensor::{Tensor, TensorId};
 pub use variable::Var;
+pub use utils::IsMultipleOf;
 
 #[cfg(feature = "cuda")]
 pub use cuda_backend as cuda;
