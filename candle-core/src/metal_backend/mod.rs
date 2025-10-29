@@ -12,7 +12,14 @@ use objc2_metal::MTLCaptureManager;
 use objc2_foundation::NSRange;
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::{Arc, Mutex, PoisonError, RwLock, TryLockError};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+    Mutex,
+    PoisonError,
+    RwLock,
+    TryLockError,
+};
 
 mod device;
 pub use device::{DeviceId, MetalDevice};
@@ -2048,6 +2055,7 @@ impl MetalStorage {
         let size = self.count * self.dtype.size_in_bytes();
         let buffer = self.device.allocate_buffer(size)?;
         let mut capture_active = false;
+        let capture_stop_flag = Arc::new(AtomicBool::new(false));
         if std::env::var_os("CANDLE_METAL_CAPTURE").is_some() {
             let path = std::env::var("CANDLE_METAL_CAPTURE_PATH")
                 .or_else(|_| std::env::var("CANDLE_METAL_CAPTURE"))
@@ -2059,6 +2067,23 @@ impl MetalStorage {
                         "[candle][metal][capture] started GPU trace at {}",
                         path
                     );
+                    let stop_flag = capture_stop_flag.clone();
+                    let forced_stop_ms = std::env::var("CANDLE_METAL_CAPTURE_FORCE_STOP_MS")
+                        .ok()
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(15_000);
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(forced_stop_ms));
+                        if !stop_flag.swap(true, Ordering::SeqCst) {
+                            unsafe {
+                                MTLCaptureManager::sharedCaptureManager().stopCapture();
+                            }
+                            eprintln!(
+                                "[candle][metal][capture] forced stop after {} ms",
+                                forced_stop_ms
+                            );
+                        }
+                    });
                 }
                 Err(err) => {
                     eprintln!(
@@ -2122,7 +2147,7 @@ impl MetalStorage {
         if let Err(err) = self.device.wait_until_completed() {
             eprintln!("[candle][metal][to_cpu] device wait failed: {err:?}");
         }
-        if capture_active {
+        if capture_active && !capture_stop_flag.swap(true, Ordering::SeqCst) {
             unsafe {
                 MTLCaptureManager::sharedCaptureManager().stopCapture();
             }
