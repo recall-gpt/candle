@@ -3,6 +3,7 @@ use crate::MetalKernelError;
 use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_metal::{MTLCommandBufferStatus, MTLCommandQueue, MTLCounterSet};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 // Use Retained when appropriate. Gives us a more elegant way of handling memory (peaks) than autoreleasepool.
 // https://docs.rs/objc2/latest/objc2/rc/struct.Retained.html
@@ -85,6 +86,7 @@ impl Commands {
     }
 
     pub fn wait_until_completed(&mut self) -> Result<(), MetalKernelError> {
+        eprintln!("[candle][metal][commands] wait_until_completed enter");
         let command_buffer = {
             let mut command_buffers = self.command_buffers.lock()?;
 
@@ -98,6 +100,12 @@ impl Commands {
         };
         if let Some(command_buffer) = command_buffer {
             // Only commit and wait if it needed
+            let status = command_buffer.status();
+            eprintln!(
+                "[candle][metal][commands] status before wait: {:?}",
+                status
+            );
+            let wait_start = Instant::now();
             match command_buffer.status() {
                 MTLCommandBufferStatus::NotEnqueued | MTLCommandBufferStatus::Enqueued => {
                     command_buffer.commit();
@@ -116,12 +124,17 @@ impl Commands {
                 // We need this final match arm because the statuses are implemented as integers, not an enum, in the objc2 framework.
                 _ => unreachable!(),
             }
+            eprintln!(
+                "[candle][metal][commands] wait completed in {:.3} ms",
+                wait_start.elapsed().as_secs_f64() * 1_000.0
+            );
         } else {
             // No command buffer to wait for, so we create one
             let command_buffer = create_command_buffer(&self.command_queue)?;
             let mut command_buffers = self.command_buffers.lock()?;
             command_buffers.insert(command_buffer);
         }
+        eprintln!("[candle][metal][commands] wait_until_completed exit");
         Ok(())
     }
 }

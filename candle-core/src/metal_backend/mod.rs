@@ -8,6 +8,7 @@ use candle_metal_kernels::{
     metal::{Buffer, Commands, Device},
     BufferOffset, CallConvTranspose2dCfg, Kernels, RESOURCE_OPTIONS,
 };
+use objc2_metal::MTLCaptureManager;
 use objc2_foundation::NSRange;
 use std::collections::HashMap;
 use std::ffi::c_void;
@@ -2046,15 +2047,87 @@ impl MetalStorage {
     pub(crate) fn to_cpu<T: Clone>(&self) -> Result<Vec<T>> {
         let size = self.count * self.dtype.size_in_bytes();
         let buffer = self.device.allocate_buffer(size)?;
+        let mut capture_active = false;
+        if std::env::var_os("CANDLE_METAL_CAPTURE").is_some() {
+            let path = std::env::var("CANDLE_METAL_CAPTURE_PATH")
+                .or_else(|_| std::env::var("CANDLE_METAL_CAPTURE"))
+                .unwrap_or_else(|_| "/tmp/candle-metal-capture.gputrace".to_string());
+            match self.device.capture(&path) {
+                Ok(()) => {
+                    capture_active = true;
+                    eprintln!(
+                        "[candle][metal][capture] started GPU trace at {}",
+                        path
+                    );
+                }
+                Err(err) => {
+                    eprintln!(
+                        "[candle][metal][capture] failed to start capture at {}: {err:?}",
+                        path
+                    );
+                }
+            }
+        }
         {
+            use std::thread::sleep;
+            use std::time::{Duration, Instant};
+
             let command_buffer = self.device.command_buffer()?;
             command_buffer.set_label("to_cpu");
             let blit = command_buffer.blit_command_encoder();
             blit.set_label("blit_to_cpu");
             blit.copy_from_buffer(&self.buffer, 0, &buffer, 0, size);
             blit.end_encoding();
+            eprintln!("[candle][metal][to_cpu] committing command buffer");
+            command_buffer.commit();
+            let wait_start = Instant::now();
+            let timeout = Duration::from_secs(10);
+            let sleep_interval = Duration::from_millis(10);
+            loop {
+                let status = command_buffer.status();
+                if status == objc2_metal::MTLCommandBufferStatus::Completed {
+                    eprintln!(
+                        "[candle][metal][to_cpu] command buffer completed after {:.3} ms",
+                        wait_start.elapsed().as_secs_f64() * 1_000.0
+                    );
+                    break;
+                }
+                if status == objc2_metal::MTLCommandBufferStatus::Error {
+                    eprintln!(
+                        "[candle][metal][to_cpu] command buffer error: {:?}",
+                        command_buffer.error()
+                    );
+                    break;
+                }
+                if wait_start.elapsed() >= timeout {
+                    eprintln!(
+                        "[candle][metal][to_cpu] command buffer wait timed out after {:.3} ms (status={:?})",
+                        wait_start.elapsed().as_secs_f64() * 1_000.0,
+                        status
+                    );
+                    let cb_clone = command_buffer.clone();
+                    std::thread::spawn(move || {
+                        cb_clone.wait_until_completed();
+                        eprintln!(
+                            "[candle][metal][to_cpu] background wait finished status={:?} error={:?}",
+                            cb_clone.status(),
+                            cb_clone.error()
+                        );
+                    });
+                    break;
+                }
+                sleep(sleep_interval);
+            }
         }
-        self.device.wait_until_completed()?;
+        if let Err(err) = self.device.wait_until_completed() {
+            eprintln!("[candle][metal][to_cpu] device wait failed: {err:?}");
+        }
+        if capture_active {
+            unsafe {
+                MTLCaptureManager::sharedCaptureManager().stopCapture();
+            }
+            eprintln!("[candle][metal][capture] stopped GPU trace");
+        }
         Ok(read_to_vec(&buffer, self.count))
     }
 }

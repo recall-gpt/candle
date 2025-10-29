@@ -2197,6 +2197,13 @@ impl Tensor {
         if self.device().same_device(device) {
             Ok(self.clone())
         } else {
+            let to_device_start = std::time::Instant::now();
+            eprintln!(
+                "[candle][to_device] start id={:?} from={:?} to={:?}",
+                self.id(),
+                self.device(),
+                device
+            );
             let storage = match (&*self.storage(), device) {
                 (Storage::Cpu(storage), Device::Cuda(cuda)) => {
                     Storage::Cuda(cuda.storage_from_cpu_storage(storage)?)
@@ -2231,6 +2238,14 @@ impl Tensor {
                 dtype: self.dtype,
                 device: device.clone(),
             };
+            let elapsed = to_device_start.elapsed().as_secs_f64() * 1_000.0;
+            eprintln!(
+                "[candle][to_device] done id={:?} from={:?} to={:?} elapsed_ms={:.3}",
+                self.id(),
+                self.device(),
+                device,
+                elapsed
+            );
             Ok(Tensor(Arc::new(tensor_)))
         }
     }

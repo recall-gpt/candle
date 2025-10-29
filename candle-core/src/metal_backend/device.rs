@@ -133,8 +133,10 @@ impl MetalDevice {
     }
 
     pub fn wait_until_completed(&self) -> Result<()> {
+        eprintln!("[candle][metal][device] wait_until_completed enter");
         let mut commands = self.commands.write().map_err(MetalError::from)?;
         commands.wait_until_completed().map_err(MetalError::from)?;
+        eprintln!("[candle][metal][device] wait_until_completed exit");
         Ok(())
     }
 
