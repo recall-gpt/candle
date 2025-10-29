@@ -9,10 +9,10 @@
 //! Tensors can also be serialized to safetensor format using the `save` function or
 //! `Tensor::save_safetensors` method.
 //!
-use crate::{DType, Device, Error, Result, Tensor, WithDType};
-use float8::F8E4M3;
 #[allow(unused_imports)]
 use crate::IsMultipleOf;
+use crate::{DType, Device, Error, Result, Tensor, WithDType};
+use float8::F8E4M3;
 use safetensors::tensor as st;
 use safetensors::tensor::SafeTensors;
 use std::borrow::Cow;

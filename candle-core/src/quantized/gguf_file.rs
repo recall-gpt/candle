@@ -2,10 +2,10 @@
 //!
 
 use super::{GgmlDType, QTensor};
-use crate::{Context, Device, Result};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 #[allow(unused_imports)]
 use crate::IsMultipleOf;
+use crate::{Context, Device, Result};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::collections::HashMap;
 
 pub const DEFAULT_ALIGNMENT: u64 = 32;

@@ -3,10 +3,10 @@ use super::utils::{
     make_qkx1_quants, make_qx_quants, nearest_int,
 };
 use super::GgmlDType;
-use crate::Result;
-use byteorder::{ByteOrder, LittleEndian};
 #[allow(unused_imports)]
 use crate::IsMultipleOf;
+use crate::Result;
+use byteorder::{ByteOrder, LittleEndian};
 use half::{bf16, f16, slice::HalfFloatSliceExt};
 use rayon::prelude::*;
 

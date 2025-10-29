@@ -3,9 +3,7 @@ use std::str::FromStr;
 
 /// Extension trait that backports the nightly-only `is_multiple_of` helper
 /// so we can keep using stable Rust compilers.
-pub trait IsMultipleOf:
-    Sized + Copy + PartialEq + std::ops::Rem<Output = Self> + From<u8>
-{
+pub trait IsMultipleOf: Sized + Copy + PartialEq + std::ops::Rem<Output = Self> + From<u8> {
     #[inline]
     fn is_multiple_of(self, other: Self) -> bool {
         if other == Self::from(0) {

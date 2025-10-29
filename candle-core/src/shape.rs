@@ -1,8 +1,8 @@
 //! The shape of a tensor is a tuple with the size of each of its dimensions.
 #![allow(clippy::redundant_closure_call)]
-use crate::{Error, Result};
 #[allow(unused_imports)]
 use crate::IsMultipleOf;
+use crate::{Error, Result};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Shape(Vec<usize>);
