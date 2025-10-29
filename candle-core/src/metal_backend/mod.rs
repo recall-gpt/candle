@@ -2093,6 +2093,7 @@ impl MetalStorage {
                 }
             }
         }
+        let trace_enabled = std::env::var_os("CANDLE_TRACE_METAL").is_some();
         {
             use std::thread::sleep;
             use std::time::{Duration, Instant};
@@ -2103,23 +2104,31 @@ impl MetalStorage {
             blit.set_label("blit_to_cpu");
             blit.copy_from_buffer(&self.buffer, 0, &buffer, 0, size);
             blit.end_encoding();
-            eprintln!("[candle][metal][to_cpu] committing command buffer");
+            if trace_enabled {
+                eprintln!("[candle][metal][to_cpu] committing command buffer");
+            }
             command_buffer.commit();
-            eprintln!(
-                "[candle][metal][to_cpu] post-commit status={:?}",
-                command_buffer.status()
-            );
+            if trace_enabled {
+                eprintln!(
+                    "[candle][metal][to_cpu] post-commit status={:?}",
+                    command_buffer.status()
+                );
+            }
             let scheduled_cb = command_buffer.clone();
             std::thread::spawn(move || {
-                eprintln!(
-                    "[candle][metal][to_cpu] wait_until_scheduled start status={:?}",
-                    scheduled_cb.status()
-                );
+                if trace_enabled {
+                    eprintln!(
+                        "[candle][metal][to_cpu] wait_until_scheduled start status={:?}",
+                        scheduled_cb.status()
+                    );
+                }
                 scheduled_cb.wait_until_scheduled();
-                eprintln!(
-                    "[candle][metal][to_cpu] command buffer scheduled status={:?}",
-                    scheduled_cb.status()
-                );
+                if trace_enabled {
+                    eprintln!(
+                        "[candle][metal][to_cpu] command buffer scheduled status={:?}",
+                        scheduled_cb.status()
+                    );
+                }
             });
             let wait_start = Instant::now();
             let timeout = Duration::from_secs(10);
@@ -2127,10 +2136,12 @@ impl MetalStorage {
             loop {
                 let status = command_buffer.status();
                 if status == objc2_metal::MTLCommandBufferStatus::Completed {
-                    eprintln!(
-                        "[candle][metal][to_cpu] command buffer completed after {:.3} ms",
-                        wait_start.elapsed().as_secs_f64() * 1_000.0
-                    );
+                    if trace_enabled {
+                        eprintln!(
+                            "[candle][metal][to_cpu] command buffer completed after {:.3} ms",
+                            wait_start.elapsed().as_secs_f64() * 1_000.0
+                        );
+                    }
                     break;
                 }
                 if status == objc2_metal::MTLCommandBufferStatus::Error {
@@ -2141,19 +2152,23 @@ impl MetalStorage {
                     break;
                 }
                 if wait_start.elapsed() >= timeout {
-                    eprintln!(
-                        "[candle][metal][to_cpu] command buffer wait timed out after {:.3} ms (status={:?})",
-                        wait_start.elapsed().as_secs_f64() * 1_000.0,
-                        status
-                    );
+                    if trace_enabled {
+                        eprintln!(
+                            "[candle][metal][to_cpu] command buffer wait timed out after {:.3} ms (status={:?})",
+                            wait_start.elapsed().as_secs_f64() * 1_000.0,
+                            status
+                        );
+                    }
                     let cb_clone = command_buffer.clone();
                     std::thread::spawn(move || {
                         cb_clone.wait_until_completed();
-                        eprintln!(
-                            "[candle][metal][to_cpu] background wait finished status={:?} error={:?}",
-                            cb_clone.status(),
-                            cb_clone.error()
-                        );
+                        if trace_enabled {
+                            eprintln!(
+                                "[candle][metal][to_cpu] background wait finished status={:?} error={:?}",
+                                cb_clone.status(),
+                                cb_clone.error()
+                            );
+                        }
                     });
                     break;
                 }
@@ -2167,7 +2182,9 @@ impl MetalStorage {
             unsafe {
                 MTLCaptureManager::sharedCaptureManager().stopCapture();
             }
-            eprintln!("[candle][metal][capture] stopped GPU trace");
+            if trace_enabled {
+                eprintln!("[candle][metal][capture] stopped GPU trace");
+            }
         }
         Ok(read_to_vec(&buffer, self.count))
     }

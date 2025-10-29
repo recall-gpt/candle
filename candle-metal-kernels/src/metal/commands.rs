@@ -5,6 +5,10 @@ use objc2_metal::{MTLCommandBufferStatus, MTLCommandQueue, MTLCounterSet};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+fn tracing_enabled() -> bool {
+    std::env::var_os("CANDLE_TRACE_METAL").is_some()
+}
+
 // Use Retained when appropriate. Gives us a more elegant way of handling memory (peaks) than autoreleasepool.
 // https://docs.rs/objc2/latest/objc2/rc/struct.Retained.html
 pub type CommandQueue = Retained<ProtocolObject<dyn MTLCommandQueue>>;
@@ -52,8 +56,8 @@ impl Commands {
         let command_buffers = Arc::new(Mutex::new(command_buffers));
 
         let compute_per_buffer = match std::env::var("CANDLE_METAL_COMPUTE_PER_BUFFER") {
-            Ok(val) => val.parse().unwrap_or(50),
-            _ => 50,
+            Ok(val) => val.parse().unwrap_or(1),
+            _ => 1,
         };
         Ok(Self {
             command_queue,
@@ -69,10 +73,12 @@ impl Commands {
             Some(command_buffer) => command_buffer,
             None => {
                 let command_buffer = create_command_buffer(&self.command_queue)?;
-                eprintln!(
-                    "[candle][metal][commands] created new command buffer thread={:?}",
-                    std::thread::current().id()
-                );
+                if tracing_enabled() {
+                    eprintln!(
+                        "[candle][metal][commands] created new command buffer thread={:?}",
+                        std::thread::current().id()
+                    );
+                }
                 command_buffers.insert(command_buffer);
                 command_buffers.get_mut().unwrap()
             }
@@ -81,20 +87,24 @@ impl Commands {
         let mut flushed = false;
         if self.command_buffer_index > self.compute_per_buffer {
             command_buffer.commit();
-            eprintln!(
-                "[candle][metal][commands] committed due to compute_per_buffer thread={:?}",
-                std::thread::current().id()
-            );
+            if tracing_enabled() {
+                eprintln!(
+                    "[candle][metal][commands] committed due to compute_per_buffer thread={:?}",
+                    std::thread::current().id()
+                );
+            }
             *command_buffer = create_command_buffer(&self.command_queue)?;
             self.command_buffer_index = 0;
             flushed = true;
         }
-        eprintln!(
-            "[candle][metal][commands] returning command buffer thread={:?} pending_index={} status={:?}",
-            std::thread::current().id(),
-            self.command_buffer_index,
-            command_buffer.status()
-        );
+        if tracing_enabled() {
+            eprintln!(
+                "[candle][metal][commands] returning command buffer thread={:?} pending_index={} status={:?}",
+                std::thread::current().id(),
+                self.command_buffer_index,
+                command_buffer.status()
+            );
+        }
         self.command_buffer_index += 1;
         Ok((flushed, command_buffer.clone()))
     }
