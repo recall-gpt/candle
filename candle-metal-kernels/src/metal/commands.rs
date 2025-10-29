@@ -69,6 +69,10 @@ impl Commands {
             Some(command_buffer) => command_buffer,
             None => {
                 let command_buffer = create_command_buffer(&self.command_queue)?;
+                eprintln!(
+                    "[candle][metal][commands] created new command buffer thread={:?}",
+                    std::thread::current().id()
+                );
                 command_buffers.insert(command_buffer);
                 command_buffers.get_mut().unwrap()
             }
@@ -77,10 +81,20 @@ impl Commands {
         let mut flushed = false;
         if self.command_buffer_index > self.compute_per_buffer {
             command_buffer.commit();
+            eprintln!(
+                "[candle][metal][commands] committed due to compute_per_buffer thread={:?}",
+                std::thread::current().id()
+            );
             *command_buffer = create_command_buffer(&self.command_queue)?;
             self.command_buffer_index = 0;
             flushed = true;
         }
+        eprintln!(
+            "[candle][metal][commands] returning command buffer thread={:?} pending_index={} status={:?}",
+            std::thread::current().id(),
+            self.command_buffer_index,
+            command_buffer.status()
+        );
         self.command_buffer_index += 1;
         Ok((flushed, command_buffer.clone()))
     }
