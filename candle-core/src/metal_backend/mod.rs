@@ -2105,6 +2105,14 @@ impl MetalStorage {
             blit.end_encoding();
             eprintln!("[candle][metal][to_cpu] committing command buffer");
             command_buffer.commit();
+            let scheduled_cb = command_buffer.clone();
+            std::thread::spawn(move || {
+                scheduled_cb.wait_until_scheduled();
+                eprintln!(
+                    "[candle][metal][to_cpu] command buffer scheduled status={:?}",
+                    scheduled_cb.status()
+                );
+            });
             let wait_start = Instant::now();
             let timeout = Duration::from_secs(10);
             let sleep_interval = Duration::from_millis(10);

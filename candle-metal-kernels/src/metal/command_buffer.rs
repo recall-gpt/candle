@@ -39,6 +39,10 @@ impl CommandBuffer {
         self.raw.enqueue()
     }
 
+    pub fn wait_until_scheduled(&self) {
+        self.raw.waitUntilScheduled()
+    }
+
     pub fn set_label(&self, label: &str) {
         self.as_ref().setLabel(Some(&NSString::from_str(label)))
     }
