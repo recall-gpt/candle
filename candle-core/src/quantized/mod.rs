@@ -541,7 +541,14 @@ impl crate::CustomOp1 for QTensor {
 impl crate::Module for QMatMul {
     fn forward(&self, xs: &Tensor) -> Result<Tensor> {
         match self {
-            Self::QTensor(t) => xs.apply_op1_no_bwd(t.as_ref()),
+            Self::QTensor(t) => {
+                if xs.dtype() == DType::F32 {
+                    xs.apply_op1_no_bwd(t.as_ref())
+                } else {
+                    let xs_f32 = xs.to_dtype(DType::F32)?;
+                    xs_f32.apply_op1_no_bwd(t.as_ref())
+                }
+            }
             Self::Tensor(w) => {
                 let w = match *xs.dims() {
                     [b1, b2, _, _] => w.broadcast_left((b1, b2))?.t()?,
