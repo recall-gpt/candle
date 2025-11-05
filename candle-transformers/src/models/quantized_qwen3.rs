@@ -413,6 +413,9 @@ impl ModelWeights {
         let _enter = self.span.enter();
         let (b, l) = input.dims2()?;
         let mut h = self.embed_tokens.forward(input)?;
+        if h.dtype() != DType::F32 {
+            h = h.to_dtype(DType::F32)?;
+        }
         let causal_mask = if l == 1 {
             None
         } else {
