@@ -1,7 +1,9 @@
 use super::{GgmlDType, QStorage};
 use crate::backend::BackendStorage;
-use crate::{DType, MetalDevice, MetalStorage, Result, Shape, D};
-use candle_metal_kernels::metal::Buffer;
+use crate::{DType, MetalDevice, MetalError, MetalStorage, Result, Shape, D};
+use candle_metal_kernels::{
+    call_quantized_dequantize_q8_0_f16, call_quantized_dequantize_q8_0_f32, metal::Buffer,
+};
 use std::sync::Arc;
 
 pub struct QMetalStorage {
@@ -34,6 +36,72 @@ impl QMetalStorage {
     }
 
     pub fn dequantize(&self, elem_count: usize) -> Result<MetalStorage> {
+        if matches!(self.dtype, GgmlDType::Q8_0) {
+            if let Ok(storage) = self.dequantize_device(elem_count, DType::F32) {
+                return Ok(storage);
+            }
+        }
+        let out = self.cpu_dequantize_f32(elem_count)?;
+        let buffer = self.device.new_buffer_with_data(&out)?;
+        Ok(MetalStorage::new(
+            buffer,
+            self.device.clone(),
+            elem_count,
+            DType::F32,
+        ))
+    }
+
+    fn dequantize_device(&self, elem_count: usize, output_dtype: DType) -> Result<MetalStorage> {
+        if !matches!(self.dtype, GgmlDType::Q8_0) {
+            crate::bail!("unsupported Metal dequantization for {:?}", self.dtype);
+        }
+        let block_size = self.dtype.block_size();
+        if elem_count % block_size != 0 {
+            crate::bail!(
+                "tensor element count {elem_count} is not divisible by block size {block_size}"
+            );
+        }
+        let block_count = elem_count / block_size;
+        let dst = self
+            .device
+            .new_buffer(elem_count, output_dtype, "qdequant")?;
+        let command_buffer = self.device.command_buffer()?;
+        command_buffer.set_label("qdequant");
+        let result = match output_dtype {
+            DType::F32 => call_quantized_dequantize_q8_0_f32(
+                self.device.device(),
+                &command_buffer,
+                self.device.kernels(),
+                block_count,
+                self.buffer.as_ref(),
+                0,
+                dst.as_ref(),
+                0,
+            ),
+            DType::F16 => call_quantized_dequantize_q8_0_f16(
+                self.device.device(),
+                &command_buffer,
+                self.device.kernels(),
+                block_count,
+                self.buffer.as_ref(),
+                0,
+                dst.as_ref(),
+                0,
+            ),
+            other => crate::bail!("unsupported output dtype for Metal dequantization {other:?}"),
+        };
+        result.map_err(MetalError::from)?;
+        command_buffer.commit();
+        self.device.wait_until_completed()?;
+        Ok(MetalStorage::new(
+            dst,
+            self.device.clone(),
+            elem_count,
+            output_dtype,
+        ))
+    }
+
+    fn cpu_dequantize_f32(&self, elem_count: usize) -> Result<Vec<f32>> {
         use crate::quantized::k_quants::GgmlType;
         let buffer = self.device.allocate_buffer(self.buffer.length())?;
         let command_buffer = self.device.command_buffer()?;
@@ -107,13 +175,24 @@ impl QMetalStorage {
                 crate::quantized::BlockQ8K::to_float(&vec, &mut out);
             }
         }
+        Ok(out)
+    }
 
-        let buffer = self.device.new_buffer_with_data(&out)?;
+    pub fn dequantize_f16(&self, elem_count: usize) -> Result<MetalStorage> {
+        if matches!(self.dtype, GgmlDType::Q8_0) {
+            if let Ok(storage) = self.dequantize_device(elem_count, DType::F16) {
+                return Ok(storage);
+            }
+        }
+        let out = self.cpu_dequantize_f32(elem_count)?;
+        let mut out_f16 = Vec::with_capacity(out.len());
+        out_f16.extend(out.into_iter().map(half::f16::from_f32));
+        let buffer = self.device.new_buffer_with_data(&out_f16)?;
         Ok(MetalStorage::new(
             buffer,
             self.device.clone(),
             elem_count,
-            DType::F32,
+            DType::F16,
         ))
     }
 

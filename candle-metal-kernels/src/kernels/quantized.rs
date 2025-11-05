@@ -1,4 +1,4 @@
-use crate::utils::EncoderProvider;
+use crate::utils::{linear_split, EncoderProvider};
 use crate::{set_params, Buffer, ComputeCommandEncoder, Device, Kernels, MetalKernelError, Source};
 use objc2_metal::{MTLResourceUsage, MTLSize};
 
@@ -19,6 +19,82 @@ pub enum GgmlDType {
     F16,
     F32,
     BF16,
+}
+
+fn dispatch_dequantize_kernel(
+    device: &Device,
+    ep: impl EncoderProvider,
+    kernels: &Kernels,
+    pipeline_name: &'static str,
+    block_count: usize,
+    src: &Buffer,
+    src_offset: usize,
+    dst: &Buffer,
+    dst_offset: usize,
+) -> Result<(), MetalKernelError> {
+    if block_count == 0 {
+        return Ok(());
+    }
+
+    let pipeline = kernels.load_pipeline(device, Source::Quantized, pipeline_name)?;
+    let (thread_groups, thread_group_size) = linear_split(&pipeline, block_count);
+    let encoder = ep.encoder();
+    let encoder: &ComputeCommandEncoder = encoder.as_ref();
+    encoder.set_compute_pipeline_state(&pipeline);
+    set_params!(
+        encoder,
+        ((src, src_offset), (dst, dst_offset), block_count as u32)
+    );
+    encoder.use_resource(src, MTLResourceUsage::Read);
+    encoder.use_resource(dst, MTLResourceUsage::Write);
+    encoder.dispatch_thread_groups(thread_groups, thread_group_size);
+    Ok(())
+}
+
+pub fn call_quantized_dequantize_q8_0_f32(
+    device: &Device,
+    ep: impl EncoderProvider,
+    kernels: &Kernels,
+    block_count: usize,
+    src: &Buffer,
+    src_offset: usize,
+    dst: &Buffer,
+    dst_offset: usize,
+) -> Result<(), MetalKernelError> {
+    dispatch_dequantize_kernel(
+        device,
+        ep,
+        kernels,
+        "kernel_dequantize_q8_0_f32",
+        block_count,
+        src,
+        src_offset,
+        dst,
+        dst_offset,
+    )
+}
+
+pub fn call_quantized_dequantize_q8_0_f16(
+    device: &Device,
+    ep: impl EncoderProvider,
+    kernels: &Kernels,
+    block_count: usize,
+    src: &Buffer,
+    src_offset: usize,
+    dst: &Buffer,
+    dst_offset: usize,
+) -> Result<(), MetalKernelError> {
+    dispatch_dequantize_kernel(
+        device,
+        ep,
+        kernels,
+        "kernel_dequantize_q8_0_f16",
+        block_count,
+        src,
+        src_offset,
+        dst,
+        dst_offset,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

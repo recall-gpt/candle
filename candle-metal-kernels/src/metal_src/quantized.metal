@@ -105,6 +105,44 @@ typedef struct {
 static_assert(sizeof(block_q8_0x8) == 8 * sizeof(half) + QK8_0 * 8, "wrong q8_0x8 block size/padding");
 
 //
+// Device-wide dequantization helpers
+//
+
+template <typename T>
+inline void write_q8_0_block(const device block_q8_0 &src, device T *dst, const uint base) {
+    const float d = static_cast<float>(src.d);
+    for (uint i = 0; i < QK8_0; ++i) {
+        dst[base + i] = static_cast<T>(static_cast<float>(src.qs[i]) * d);
+    }
+}
+
+kernel void kernel_dequantize_q8_0_f32(
+        device const block_q8_0 * src,
+        device       float      * dst,
+        constant       uint    & block_count,
+        uint gid [[thread_position_in_grid]]) {
+    if (gid >= block_count) {
+        return;
+    }
+    const uint base = gid * QK8_0;
+    const device block_q8_0 &block = src[gid];
+    write_q8_0_block<float>(block, dst, base);
+}
+
+kernel void kernel_dequantize_q8_0_f16(
+        device const block_q8_0 * src,
+        device       half       * dst,
+        constant       uint    & block_count,
+        uint gid [[thread_position_in_grid]]) {
+    if (gid >= block_count) {
+        return;
+    }
+    const uint base = gid * QK8_0;
+    const device block_q8_0 &block = src[gid];
+    write_q8_0_block<half>(block, dst, base);
+}
+
+//
 // Ternary quantization
 //
 

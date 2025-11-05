@@ -3,7 +3,7 @@ use candle_core::{
     quantized::{self, GgmlDType},
     test_device,
     test_utils::to_vec2_round,
-    DType, Device, IndexOp, IsMultipleOf, Module, Result, Tensor,
+    DType, Device, IndexOp, Module, Result, Tensor,
 };
 use quantized::{k_quants, GgmlType};
 use rand::prelude::*;
@@ -83,6 +83,48 @@ fn test_matmul_mm() -> Result<()> {
     assert!(
         error <= 0.001,
         "Error {error} is too big. \nExpected:\n {mm} \nFound:\n {res}\n for {dtype:?}"
+    );
+
+    Ok(())
+}
+
+#[cfg(feature = "metal")]
+#[test]
+fn metal_dequantization_matches_cpu() -> Result<()> {
+    let metal = Device::new_metal(0)?;
+    let shape = (64, 128);
+    let cpu_src = Tensor::randn(0f32, 1f32, shape, &Device::Cpu)?;
+    let metal_src = cpu_src.to_device(&metal)?;
+
+    let cpu_q = quantized::QTensor::quantize(&cpu_src, GgmlDType::Q8_0)?;
+    let metal_q = quantized::QTensor::quantize(&metal_src, GgmlDType::Q8_0)?;
+
+    let cpu_dequant = cpu_q.dequantize(&Device::Cpu)?;
+    let metal_dequant = metal_q.dequantize(&metal)?.to_device(&Device::Cpu)?;
+    let max_diff = (&metal_dequant - &cpu_dequant)?
+        .abs()?
+        .flatten_all()?
+        .to_vec1::<f32>()?
+        .into_iter()
+        .fold(0f32, f32::max);
+    assert!(
+        max_diff < 1e-4,
+        "Metal F32 dequantization diverged from CPU path: {max_diff}"
+    );
+
+    let metal_dequant_f16 = metal_q
+        .dequantize_f16(&metal)?
+        .to_device(&Device::Cpu)?
+        .to_dtype(DType::F32)?;
+    let max_diff_f16 = (&metal_dequant_f16 - &cpu_dequant)?
+        .abs()?
+        .flatten_all()?
+        .to_vec1::<f32>()?
+        .into_iter()
+        .fold(0f32, f32::max);
+    assert!(
+        max_diff_f16 < 5e-2,
+        "Metal F16 dequantization diverged from CPU path: {max_diff_f16}"
     );
 
     Ok(())

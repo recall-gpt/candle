@@ -382,6 +382,12 @@ impl QTensor {
                 crate::tensor::from_storage(Storage::Cuda(s), self.shape.clone(), none, false)
                     .to_device(device)
             }
+            QStorage::Metal(s) => {
+                let s = s.dequantize_f16(self.shape.elem_count())?;
+                let none = crate::op::BackpropOp::none();
+                crate::tensor::from_storage(Storage::Metal(s), self.shape.clone(), none, false)
+                    .to_device(device)
+            }
             _ => {
                 let s = self.dequantize(device)?.to_dtype(crate::DType::F16)?;
                 Ok(s)
