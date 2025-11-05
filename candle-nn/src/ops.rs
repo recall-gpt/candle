@@ -611,6 +611,7 @@ impl candle::CustomOp2 for RmsNorm {
         let name = match (s1.dtype(), s2.dtype()) {
             (DType::F32, DType::F32) => "rmsnorm_f32",
             (DType::F16, DType::F16) => "rmsnorm_f16",
+            (DType::F16, DType::F32) => "rmsnorm_f16_f32",
             (DType::BF16, DType::BF16) => "rmsnorm_bf16",
             (dt1, dt2) => candle::bail!("rmsnorm is not implemented for {dt1:?} {dt2:?}"),
         };

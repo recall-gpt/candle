@@ -945,13 +945,13 @@ kernel void NAME(                                       \
 }
 
 
-template<typename T>
+template<typename T, typename TA>
 METAL_FUNC void rmsnorm(
     constant size_t & src_numel,
     constant size_t & el_to_sum_per_block,
     device const T * src,
     device T * dst,
-    device const T * alpha,
+    device const TA * alpha,
     constant float & eps,
     uint id,
     uint tid,
@@ -1056,13 +1056,13 @@ METAL_FUNC void layernorm(
 
 constant int THREADGROUP_SIZE = 2048;
 
-#define RMSNORM(NAME, T) \
+#define RMSNORM(NAME, T, TA) \
 kernel void NAME( \
     constant size_t &src_numel, \
     constant size_t &el_to_sum_per_block, \
     device const T *src, \
     device T *dst, \
-    device const T *alpha, \
+    device const TA *alpha, \
     constant float &eps, \
     uint id [[ thread_position_in_grid ]], \
     uint tid [[ thread_index_in_threadgroup ]], \
@@ -1071,7 +1071,7 @@ kernel void NAME( \
 ) { \
     threadgroup float shared_memory[THREADGROUP_SIZE]; \
     shared_memory[tid] = 0; \
-    rmsnorm<T>(src_numel, el_to_sum_per_block, src, dst, alpha, eps, id, tid, dst_id, block_dim, shared_memory); \
+    rmsnorm<T, TA>(src_numel, el_to_sum_per_block, src, dst, alpha, eps, id, tid, dst_id, block_dim, shared_memory); \
 } \
 
 #define LAYERNORM(NAME, T) \
@@ -1223,8 +1223,9 @@ kernel void FN_NAME_THD( \
     rope_thd<TYPENAME>(b, t, h, d, stride_b, src, cos, sin, dst, idx); \
 }\
 
-RMSNORM(rmsnorm_f32, float)
-RMSNORM(rmsnorm_f16, half)
+RMSNORM(rmsnorm_f32, float, float)
+RMSNORM(rmsnorm_f16, half, half)
+RMSNORM(rmsnorm_f16_f32, half, float)
 LAYERNORM(layernorm_f32, float)
 LAYERNORM(layernorm_f16, half)
 ROPE(rope_f32, rope_i_f32, rope_thd_f32, float)
@@ -1284,7 +1285,7 @@ impl_arg_reduce(Max, fast_argmax_bf16, bfloat)
 
 impl_softmax(softmax_bf16, bfloat)
 
-RMSNORM(rmsnorm_bf16, bfloat)
+RMSNORM(rmsnorm_bf16, bfloat, bfloat)
 LAYERNORM(layernorm_bf16, bfloat)
 ROPE(rope_bf16, rope_i_bf16, rope_thd_bf16, bfloat)
 #endif

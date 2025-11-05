@@ -4,7 +4,7 @@ extern crate intel_mkl_src;
 #[cfg(feature = "accelerate")]
 extern crate accelerate_src;
 
-use candle::{test_device, test_utils::to_vec3_round, Device, IndexOp, Result, Tensor};
+use candle::{test_device, test_utils::to_vec3_round, DType, Device, IndexOp, Result, Tensor};
 
 fn softmax(device: &Device) -> Result<()> {
     let data = &[[[3f32, 1., 4.], [1., 5., 9.]], [[2., 1., 7.], [8., 2., 8.]]];
@@ -72,8 +72,21 @@ fn rms_norm(device: &Device) -> Result<()> {
             [[0.4714, 0.4714, 4.9497], [1.206, 0.603, 3.6181]]
         ]
     );
-    let diff = (t - t2)?.abs()?.sum_all()?.to_vec0::<f32>()?;
+    let diff = (t.clone() - t2)?.abs()?.sum_all()?.to_vec0::<f32>()?;
     assert!(diff < 1e-5);
+    if device.is_metal() {
+        let tensor_f16 = tensor.to_dtype(DType::F16)?;
+        let mixed = candle_nn::ops::rms_norm(&tensor_f16, &alpha, 1e-5)?;
+        let mixed_f32 = mixed.to_dtype(DType::F32)?;
+        let baseline_f32 = t.to_dtype(DType::F32)?;
+        let mixed_diff = (mixed_f32 - baseline_f32)?
+            .abs()?
+            .flatten_all()?
+            .max(0)?
+            .reshape(())?
+            .to_vec0::<f32>()?;
+        assert!(mixed_diff < 5e-3);
+    }
     Ok(())
 }
 
